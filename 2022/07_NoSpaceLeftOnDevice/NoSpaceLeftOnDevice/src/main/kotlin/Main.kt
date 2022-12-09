@@ -1,27 +1,49 @@
 import java.io.BufferedReader
 import java.io.File
 
-private const val max_filesize = 100000
-private const val freeUpSpace_Threshold = 8381165
+private const val MAX_FILESIZE = 100000
+private const val MAX_HD = 70000000
+private const val UPDATE_SIZE = 30000000
 
 fun main(args: Array<String>) {
-    val bufferedReader: BufferedReader = File("..\\testInput.txt").bufferedReader()
+    val bufferedReader: BufferedReader = File("../input.txt").bufferedReader()
     val inputString = bufferedReader.use { it.readText() }
 
     val rootDir = inputStringToFileSystem(inputString)
 
+    val sizeNeeded = UPDATE_SIZE - (MAX_HD - rootDir.getSize())
+    //printFileStructure(rootDir)
+
     println(calculateSizeOfFoldersInSubFileSystem(rootDir))
 
-    val rootDir2 = inputStringToFileSystem(inputString)
-    println(getSpaceOfDirectoryClosestToThreshold(rootDir2))
+    println(getSpaceOfDirectoryClosestToThreshold(rootDir, sizeNeeded))
 }
 
-private fun getSpaceOfDirectoryClosestToThreshold(directory: Directory): Int {
-    var bestValue = if (directory.getSize() >= freeUpSpace_Threshold) directory.getSize() else Int.MAX_VALUE
+private fun printFileStructure(directory: Directory, depth: Int = 0) {
+    printTabs(depth)
+    println("- ${directory.name} (dir, size=${directory.getSize()})")
+    directory.children.forEach {
+        printFileStructure(it, depth + 1)
+    }
+    directory.files.forEach {
+        printTabs(depth + 1)
+        println("- ${it.name} (file, size =${it.size})")
+    }
+}
+
+private fun printTabs(number: Int) {
+    for (i in 1..number) {
+        print("\t")
+    }
+}
+
+private fun getSpaceOfDirectoryClosestToThreshold(directory: Directory, size_needed: Int): Int {
+    var bestValue = if (directory.getSize() >= size_needed) directory.getSize() else Int.MAX_VALUE
 
     directory.children.forEach {
-        val bestOfChild = getSpaceOfDirectoryClosestToThreshold(it)
-        if (bestOfChild < bestValue && bestOfChild >= freeUpSpace_Threshold) {
+        val bestOfChild = getSpaceOfDirectoryClosestToThreshold(it, size_needed)
+
+        if (bestOfChild in size_needed until bestValue) {
             bestValue = bestOfChild
         }
     }
@@ -29,7 +51,7 @@ private fun getSpaceOfDirectoryClosestToThreshold(directory: Directory): Int {
 }
 
 private fun inputStringToFileSystem(input: String): Directory {
-    val lines = input.split("\r\n")
+    val lines = input.split("\n")
     val rootDir = Directory(null, "/")
     var curDir = rootDir
 
@@ -53,8 +75,9 @@ private fun inputStringToFileSystem(input: String): Directory {
             if (it.startsWith("dir")) {
                 curDir.children.add(Directory(curDir, it.split(" ").last()))
             } else {
-                var curFileSize = it.split(" ")[0].toInt()
-                curDir.files.add(LocalFile(curFileSize))
+                val splittedArg = it.split(" ")
+                var curFileSize = splittedArg[0].toInt()
+                curDir.files.add(LocalFile(curFileSize, splittedArg[1]))
             }
         }
     })
@@ -64,7 +87,7 @@ private fun inputStringToFileSystem(input: String): Directory {
 
 private fun calculateSizeOfFoldersInSubFileSystem(dir: Directory): Int {
     var size = 0
-    size += if (dir.getSize() <= max_filesize) dir.getSize() else 0
+    size += if (dir.getSize() <= MAX_FILESIZE) dir.getSize() else 0
     dir.children.forEach({
         size += calculateSizeOfFoldersInSubFileSystem(it)
     })
@@ -95,6 +118,6 @@ class Directory(val parentDir: Directory?, val name: String) {
     }
 }
 
-class LocalFile(val size: Int) {
+class LocalFile(val size: Int, val name: String) {
 
 }
