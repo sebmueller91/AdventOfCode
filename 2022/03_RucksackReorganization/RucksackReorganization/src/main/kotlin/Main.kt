@@ -1,14 +1,32 @@
 import java.io.BufferedReader
 import java.io.File
-import java.lang.Exception
 
 fun main(args: Array<String>) {
     val bufferedReader: BufferedReader = File("..\\input.txt").bufferedReader()
     val inputString = bufferedReader.use { it.readText() }
 
     val formattedInput = formatInput(inputString)
-
     println(sumUpPriorities(formattedInput))
+
+    val formattedInput2 = divideIntoGroupsOfThree(inputString)
+    println(sumUpPriorities2(formattedInput2))
+}
+
+private fun divideIntoGroupsOfThree(input: String) : List<GroupOfThree> {
+    var list = mutableListOf<GroupOfThree>()
+    var splitted = input.split("\r\n")
+    for (i in 0..splitted.count()-1 step 3) {
+        list.add(GroupOfThree(splitted[i],splitted[i+1],splitted[i+2]))
+    }
+    return list
+}
+
+private fun sumUpPriorities2(list: List<GroupOfThree>) : Int {
+    var score = 0
+    list.forEach({
+        score += getPriorityOfCharacter(it.getDuplicateCharacter())
+    })
+    return score
 }
 
 private fun sumUpPriorities(input: List<Pair<String, String>>) : Int {
@@ -19,6 +37,7 @@ private fun sumUpPriorities(input: List<Pair<String, String>>) : Int {
     })
     return score
 }
+
 private fun getPriorityOfCharacter(char: Char) : Int {
     var charAsInt = char.code.toInt()
     when (charAsInt) {
@@ -52,4 +71,19 @@ private fun formatInput(input: String) : List<Pair<String, String>> {
 private fun splitStringInHalf(string: String) : Pair<String, String> {
     val len = string.length/2
     return Pair<String, String>(string.substring(0,len),string.substring(len,string.length))
+}
+
+private class GroupOfThree(
+    val string1: String,
+    val string2: String,
+    val string3: String
+) {
+    fun getDuplicateCharacter() : Char {
+        string1.toCharArray().forEach {
+            if (string2.toCharArray().contains(it) && string3.toCharArray().contains(it)) {
+                return it
+            }
+        }
+        throw Exception()
+    }
 }
