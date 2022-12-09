@@ -5,13 +5,14 @@ import java.io.File
 fun main(args: Array<String>) {
     val bufferedReader: BufferedReader = File("..\\input.txt").bufferedReader()
     val inputString = bufferedReader.use { it.readText() }
-    println(findPositionOfFirstMarker(inputString))
+    println(findPositionOfFirstMarker(inputString,4 ))
+    println(findPositionOfFirstMarker(inputString,14 ))
 }
 
-private fun findPositionOfFirstMarker(input: String) : Int {
+private fun findPositionOfFirstMarker(input: String, markerCount: Int) : Int {
     val charArray = input.toCharArray()
-    for (i in (4..input.length)) {
-        if (containsDuplicateCharacter(charArray.copyOfRange(i-4,i))) {
+    for (i in (markerCount..input.length)) {
+        if (containsDuplicateCharacter(charArray.copyOfRange(i-markerCount,i))) {
             return i
         }
     }
