@@ -6,18 +6,26 @@ fun main(args: Array<String>) {
     val inputString = bufferedReader.use { it.readText() }
 
     val map = formatInput(inputString)
-    println(map.start)
-    println(map.destination)
-
     map.calculateShortestWays()
-    printArray(map.shortestWays)
-    println(map.heights.size)
 
     println(map.shortestWays[map.start.row][map.start.col])
+    println(getBestBikeWayLength(map))
+}
+
+private fun getBestBikeWayLength(map: Map) : Int {
+    var min = Int.MAX_VALUE
+    for (i in 0..map.rows-1) {
+        for (j in 0..map.cols-1) {
+            if (map.heights[i][j] == charToHeight('a')) {
+                min = Math.min(map.shortestWays[i][j], min)
+            }
+        }
+    }
+    return min
 }
 
 private fun formatInput(input: String): Map {
-    val lines = input.split("\r\n")
+    val lines = input.split("\n")
     val rows = lines.count()
     val cols = lines[0].count()
     val array = Array(rows) { Array(cols) { 0 } }
@@ -62,6 +70,10 @@ private class Map(
     val destination: Coord,
     val shortestWays: Array<Array<Int>> = Array(heights.size) { Array(heights[0].size) { Int.MAX_VALUE } }
 ) {
+    val rows
+        get() = heights.size
+    val cols
+        get() = heights[0].size
 
     fun calculateShortestWays() {
         fillField(destination, 0)
@@ -79,7 +91,7 @@ private class Map(
         val validNeighbors = getValidNeighbors(pos)
         validNeighbors.forEach {
             val height = heights[it.row][it.col]
-            if (Math.abs(curHeight - height) <= 1) {
+            if (height >= curHeight-1) {
                 fillField(it, stepsNeeded+1)
             }
         }
@@ -93,8 +105,6 @@ private class Map(
             Coord(pos.row + 1, pos.col),
             Coord(pos.row, pos.col + 1)
         )
-        val rows = heights.size
-        val cols = heights[0].size // TODO: Move into class
         val filteredNeighmors = mutableListOf<Coord>()
         neighbors.forEach {
             if (it.row in 0..rows - 1 && it.col in 0..cols - 1) {
