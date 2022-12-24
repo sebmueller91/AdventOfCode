@@ -1,66 +1,124 @@
 import java.io.BufferedReader
 import java.io.File
+import java.lang.Exception
 
 fun main(args: Array<String>) {
-    val bufferedReader: BufferedReader = File("../testInput.txt").bufferedReader()
+    val test = false
+    val bufferedReader: BufferedReader = File(if (test) "../testInput.txt" else "../input.txt").bufferedReader()
     val inputString = bufferedReader.use { it.readText() }
+    val xyMax = if (test) 20 else 4000000
 
     val measurements = formatInput(inputString)
-    val grid = createGrid(measurements)
+    val nonBeaconCoords = getListsOfNonBeaconCoordsInRow(if (test) 10 else 2000000, measurements)
+    val combinedList = combineLists(nonBeaconCoords)
+    println("Problem 1: ${combinedList.size}")
+    if (test) plot(measurements)
 
-    grid.fillNonBeaconCells()
-    grid.plot()
-    //println(grid.countNonBeaconCells())
+    val beaconPos = findPossibleBeaconLocation(measurements, xyMax)
+    println("Problem 2: ${beaconPos}")
+    println("Problem 2: ${calculateTuningFrequency(beaconPos)}")
 }
 
-private fun createGrid(measurements: List<Measurement>) : Grid {
-    val rowMin = getMinValue(measurements, {x:Int -> measurements[x].sensorPos.row})
-    val colMin = getMinValue(measurements, {x:Int -> measurements[x].sensorPos.col})
-    val rowMax = getMaxValue(measurements, {x:Int -> measurements[x].sensorPos.row})
-    val colMax = getMaxValue(measurements, {x:Int -> measurements[x].sensorPos.col})
+private fun findPossibleBeaconLocation(measurements: List<Measurement>, xyMax: Int): Coordinate {
+    val block = Block(
+        leftTop = Coordinate(0, 0),
+        rightBottom = Coordinate(xyMax, xyMax),
+    )
 
-    var rows = rowMax-rowMin+2
-    var cols = colMax-colMin+2
+    return block.findBeacon(measurements)
+}
 
-    val array = Array (rows) {Array (cols) {Cell()} }
-    val grid = Grid(array,rowMin, colMin)
-
-    measurements.forEach {
-        grid.set(it.sensorPos.row, it.sensorPos.col, grid.get(it.sensorPos.row, it.sensorPos.col).copy(obj = Object.SENSOR))
-        grid.set(it.beaconPos.row, it.beaconPos.col, grid.get(it.beaconPos.row, it.beaconPos.col).copy(obj = Object.BEACON))
+private fun Block.findBeacon(measurements: List<Measurement>): Coordinate? {
+    if (size == 1) {
+        return leftTop
     }
-
-    return grid
-}
-
-private fun getMinValue(measurements: List<Measurement>, getValue: (Int) -> Int): Int {
-    var extreme = Int.MAX_VALUE
-    for (i in 0..measurements.size - 1) {
-        if (getValue(i) - measurements[i].distance() < extreme) {
-            extreme = getValue(i) - measurements[i].distance()
+    else {
+        val subBlocks = divideIntoSubblocks()
+        subBlocks.forEach {
+            if (!it.anySensorCoversBlock(measurements)) {
+               (it.findBeacon(measurements))
+            }
         }
     }
-    return extreme
+
 }
 
-private fun getMaxValue(measurements: List<Measurement>, getValue: (Int) -> Int): Int {
-    var extreme = Int.MIN_VALUE
-    for (i in 0..measurements.size - 1) {
-        if (getValue(i) + measurements[i].distance() > extreme) {
-            extreme = getValue(i) + measurements[i].distance()
-        }
+private fun Block.anySensorCoversBlock(measurements: List<Measurement>) : Boolean{
+    return measurements.any{
+        leftTop.coordinateIsInReachOfSensor(it)
+                && rightTop.coordinateIsInReachOfSensor(it)
+                && rightBottom.coordinateIsInReachOfSensor(it)
+                && leftBottom.coordinateIsInReachOfSensor(it)
     }
-    return extreme
+
+}
+private fun Coordinate.coordinateIsInReachOfSensor(measurement: Measurement): Boolean {
+    return manhattanDistance(measurement.sensorPos) <= measurement.distanceSensorBeacon()
 }
 
-private fun formatInput(input: String) : List<Measurement> {
+private fun calculateTuningFrequency(coordinate: Coordinate): Int {
+    return coordinate.x * 4000000 + coordinate.y
+}
+
+private fun plot(measurements: List<Measurement>) {
+    for (r in -5..26) {
+        val nonBeaconCoords = getListsOfNonBeaconCoordsInRow(r, measurements)
+        val combinedList = combineLists(nonBeaconCoords)
+        print(r.toString().padStart(2, ' '))
+        for (c in -5..25) {
+            val curCoord = Coordinate(c, r)
+            when {
+                combinedList.contains(Coordinate(c, r)) -> print('#')
+                measurements.any { it.sensorPos == curCoord } -> print('S')
+                measurements.any { it.beaconPos == curCoord } -> print('B')
+                else -> print('.')
+            }
+        }
+        println()
+    }
+}
+
+private fun combineLists(lists: List<List<Coordinate>>): List<Coordinate> {
+    var combinedList = lists.first()
+    lists.drop(1).forEach { list ->
+        combinedList = (combinedList + list).distinct()
+    }
+    return combinedList
+}
+
+private fun getListsOfNonBeaconCoordsInRow(
+    row: Int,
+    measurements: List<Measurement>,
+    ignoreBeacons: Boolean = false
+): List<List<Coordinate>> {
+    val lists = mutableListOf<List<Coordinate>>()
+    measurements.forEach { measurement ->
+        val curList = mutableListOf<Coordinate>()
+
+        val dist = measurement.distanceSensorBeacon()
+        for (i in measurement.sensorPos.x - dist..measurement.sensorPos.x + dist) {
+            val curCoord = Coordinate(i, row)
+            if (curCoord.manhattanDistance(measurement.sensorPos) <= dist
+                && (ignoreBeacons || !measurements.any { it.beaconPos == curCoord })
+            ) {
+                curList.add(curCoord)
+            }
+        }
+
+        lists.add(curList)
+    }
+    return lists
+}
+
+private fun formatInput(input: String): List<Measurement> {
     val splitted = input.split('\n')
     val list = mutableListOf<Measurement>()
 
     splitted.forEach {
-        val (sr, sc, br, bc) = "Sensor at x=(.*), y=(.*): closest beacon is at x=(.*), y=(.*)".toRegex().find(input)!!.destructured
-        val sensorPos = Coordinate(sr.toInt(), sc.toInt())
-        val beaconPos = Coordinate(br.toInt(), bc.toInt())
+        val (sx, sy, bx, by) = "Sensor at x=(.*), y=(.*): closest beacon is at x=(.*), y=(.*)".toRegex()
+            .find(it)!!.destructured
+        val sensorPos = Coordinate(sx.toInt(), sy.toInt())
+        val beaconPos = Coordinate(bx.toInt(), by.toInt())
 
         list.add(Measurement(sensorPos, beaconPos))
     }
@@ -72,47 +130,59 @@ private data class Measurement(
     val sensorPos: Coordinate,
     val beaconPos: Coordinate
 ) {
-     fun distance() : Int {
-         return Math.abs(sensorPos.row-beaconPos.row) + Math.abs(sensorPos.col-beaconPos.col)
-     }
+    fun distanceSensorBeacon(): Int {
+        return sensorPos.manhattanDistance(beaconPos)
+    }
+}
+
+private data class Block(
+    val leftTop: Coordinate,
+    val rightBottom: Coordinate
+
+) {
+    val size:Int
+        get() = rightBottom.x - leftTop.x
+    val half_size: Int
+        get() = size/2
+    val leftBottom: Coordinate = Coordinate(leftTop.x, rightBottom.y)
+    val rightTop: Coordinate = Coordinate(rightBottom.x, leftTop.y)
+
+    fun divideIntoSubblocks(): List<Block> {
+        return listOf(
+            // top left block
+            Block(
+                leftTop = leftTop,
+                rightBottom = Coordinate(leftTop.x + half_size, leftTop.y + half_size)
+            ),
+            // top right block
+            Block(
+                leftTop = Coordinate(leftTop.x+half_size, leftTop.y),
+                rightBottom = Coordinate(rightBottom.x, leftTop.y+half_size)
+            ),
+            // bottom right block
+            Block(
+                leftTop = Coordinate(leftTop.x+half_size, leftTop.y+half_size),
+                rightBottom = rightBottom
+            ),
+            // bottom left block
+            Block(
+                leftTop = Coordinate(leftTop.x, leftTop.y+half_size),
+                rightBottom = Coordinate(leftTop.x+half_size, rightBottom.y)
+            )
+        )
+
+    }
 }
 
 private data class Coordinate(
-    val row: Int,
-    val col: Int
-)
-
-private data class Grid(
-    private val grid: Array<Array<Cell>>,
-    private val startRow: Int,
-    private val startCol: Int,
-    private val rows: Int = grid.size,
-    private val cols: Int = grid[0].size
+    val x: Int,
+    val y: Int
 ) {
-    fun get(row: Int, col: Int) : Cell {
-        return grid[row-startRow][col-startCol]
+    operator fun plus(other: Coordinate): Coordinate {
+        return Coordinate(x + other.x, y + other.y)
     }
 
-    fun set(row: Int, col: Int, cell: Cell) {
-        grid[row-startRow][col-startCol] = cell
+    fun manhattanDistance(other: Coordinate): Int {
+        return Math.abs(x - other.x) + Math.abs(y - other.y)
     }
-
-    fun plot() {
-        TODO("Not yet implemented")
-    }
-
-    fun fillNonBeaconCells() {
-        TODO("Not yet implemented")
-    }
-}
-
-private data class Cell(
-    val canContainBeacon: Boolean = true,
-    val obj: Object = Object.EMPTY
-)
-
-private enum class Object {
-    BEACON,
-    SENSOR,
-    EMPTY
 }
