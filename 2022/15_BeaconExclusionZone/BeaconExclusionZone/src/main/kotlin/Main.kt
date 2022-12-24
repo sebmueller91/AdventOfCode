@@ -15,8 +15,7 @@ fun main(args: Array<String>) {
     if (test) plot(measurements)
 
     val beaconPos = findPossibleBeaconLocation(measurements, xyMax)
-    println("Problem 2: ${beaconPos}")
-    println("Problem 2: ${calculateTuningFrequency(beaconPos)}")
+    println("Problem 2: ${beaconPos}, tuning frequency: ${calculateTuningFrequency(beaconPos)}")
 }
 
 private fun findPossibleBeaconLocation(measurements: List<Measurement>, xyMax: Int): Coordinate {
@@ -25,7 +24,12 @@ private fun findPossibleBeaconLocation(measurements: List<Measurement>, xyMax: I
         rightBottom = Coordinate(xyMax, xyMax),
     )
 
-    return block.findBeacon(measurements)
+    var res = block.findBeacon(measurements)
+    if (res == null) {
+        throw Exception("No beacon found")
+    } else {
+        return res
+    }
 }
 
 private fun Block.findBeacon(measurements: List<Measurement>): Coordinate? {
@@ -36,11 +40,20 @@ private fun Block.findBeacon(measurements: List<Measurement>): Coordinate? {
         val subBlocks = divideIntoSubblocks()
         subBlocks.forEach {
             if (!it.anySensorCoversBlock(measurements)) {
-               (it.findBeacon(measurements))
+                val res = it.findBeacon(measurements)
+                if (res != null && !res.isCovered(measurements)) {
+                    return res
+                }
             }
         }
     }
+    return null
+}
 
+private fun Coordinate.isCovered(measurements: List<Measurement>) : Boolean {
+    val nonBeaconCoords = getListsOfNonBeaconCoordsInRow(this.y, measurements)
+    val combinedList = combineLists(nonBeaconCoords)
+    return combinedList.contains(this)
 }
 
 private fun Block.anySensorCoversBlock(measurements: List<Measurement>) : Boolean{
@@ -56,8 +69,8 @@ private fun Coordinate.coordinateIsInReachOfSensor(measurement: Measurement): Bo
     return manhattanDistance(measurement.sensorPos) <= measurement.distanceSensorBeacon()
 }
 
-private fun calculateTuningFrequency(coordinate: Coordinate): Int {
-    return coordinate.x * 4000000 + coordinate.y
+private fun calculateTuningFrequency(coordinate: Coordinate): Long {
+    return coordinate.x * 4000000L + coordinate.y
 }
 
 private fun plot(measurements: List<Measurement>) {
